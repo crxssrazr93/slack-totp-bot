@@ -1,0 +1,13 @@
+[project]
+name = "slack-totp-bot"
+version = "0.1.0"
+description = "Slack bot that posts shared TOTP (2FA) codes from a private Google Sheet, running on Cloudflare Workers."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["workers-py", "workers-runtime-sdk", "pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

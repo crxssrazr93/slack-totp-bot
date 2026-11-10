@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.wrangler/
+node_modules/
+src/vendor/
+python_modules/
+.dev.vars
+*.json.key
+service-account*.json
+.venv-workers/
+pylock.toml

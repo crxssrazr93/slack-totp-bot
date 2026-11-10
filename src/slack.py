@@ -1,0 +1,98 @@
+"""Slack request verification and message building (pure Python, no I/O)."""
+
+import hashlib
+import hmac
+
+from accounts import Account
+from totp import totp, window_end
+
+MAX_REQUEST_AGE_SECONDS = 60 * 5
+MAX_ACCOUNT_BLOCKS = 45  # Slack allows 50 blocks per message; leave room for header/footer.
+
+
+def verify_signature(signing_secret: str, timestamp: str, body: str, signature: str, now: float) -> bool:
+    """Check X-Slack-Signature as described in https://api.slack.com/authentication/verifying-requests-from-slack"""
+    try:
+        if abs(now - int(timestamp)) > MAX_REQUEST_AGE_SECONDS:
+            return False
+    except (TypeError, ValueError):
+        return False
+    base = f"v0:{timestamp}:{body}".encode()
+    expected = "v0=" + hmac.new(signing_secret.encode(), base, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature or "")
+
+
+def _until(ts: int) -> str:
+    """Slack renders this in each viewer's own timezone."""
+    return f"<!date^{ts}^{{time_secs}}|{ts}>"
+
+
+def _title(account: Account) -> str:
+    title = f"*{account.name}*"
+    if account.username:
+        title += f"  ({account.username})"
+    if account.notes:
+        title += f"\n_{account.notes}_"
+    return title
+
+
+def _problems_block(problems: list[str]) -> list[dict]:
+    if not problems:
+        return []
+    text = ":warning: Some sheet rows were skipped:\n" + "\n".join(f"• {p}" for p in problems)
+    return [{"type": "context", "elements": [{"type": "mrkdwn", "text": text[:2900]}]}]
+
+
+def command_response(accounts: list[Account], problems: list[str], query: str, now: float) -> dict:
+    """Ephemeral reply to /totp [query]. Only the person who ran it sees it."""
+    query = query.strip().lower()
+    matches = [a for a in accounts if query in a.name.lower()] if query else accounts
+    if not matches:
+        text = f"No account matches `{query}`." if query else "No accounts in the sheet yet."
+        return {"response_type": "ephemeral", "text": text}
+
+    blocks = []
+    for account in matches[:MAX_ACCOUNT_BLOCKS]:
+        code = totp(account.secret, now, account.digits, account.period, account.algorithm)
+        seconds_left = window_end(now, account.period) - int(now)
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"{_title(account)}\n`{code}`  expires in {seconds_left}s"},
+        })
+    blocks += _problems_block(problems)
+    return {"response_type": "ephemeral", "text": "TOTP codes", "blocks": blocks}
+
+
+def board_message(accounts: list[Account], problems: list[str], now: float) -> dict:
+    """The pinned "live board", rewritten every minute by the cron trigger.
+
+    Each account shows the current code and the next one, so a code is
+    always on screen even between cron runs.
+    """
+    blocks = [{
+        "type": "header",
+        "text": {"type": "plain_text", "text": "Shared 2FA codes (auto refresh every minute)"},
+    }]
+    for account in accounts[:MAX_ACCOUNT_BLOCKS]:
+        now_end = window_end(now, account.period)
+        current = totp(account.secret, now, account.digits, account.period, account.algorithm)
+        upcoming = totp(account.secret, now_end, account.digits, account.period, account.algorithm)
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"{_title(account)}\n"
+                    f"Now: `{current}` until {_until(now_end)}\n"
+                    f"Next: `{upcoming}` until {_until(now_end + account.period)}"
+                ),
+            },
+        })
+    if not accounts:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "No accounts in the sheet yet."}})
+    blocks += _problems_block(problems)
+    blocks.append({
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": f"Updated {_until(int(now))}. Need a guaranteed fresh code? Type `/totp <name>`."}],
+    })
+    return {"text": "Shared 2FA codes", "blocks": blocks}

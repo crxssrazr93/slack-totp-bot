@@ -1,0 +1,23 @@
+name = "slack-totp-bot"
+main = "src/entry.py"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["python_workers"]
+
+# Every minute: rewrite the live board message in the channel.
+[triggers]
+crons = ["* * * * *"]
+
+# Stores only the Slack timestamp of the board message. No secrets go here.
+[[kv_namespaces]]
+binding = "BOARD"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+SHEET_ID = "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID"
+SHEET_RANGE = "TOTP!A:Z"
+SLACK_CHANNEL_ID = "REPLACE_WITH_YOUR_PRIVATE_CHANNEL_ID"
+
+# Secrets (set with `uv run pywrangler secret put NAME`, never commit them):
+#   SLACK_BOT_TOKEN              xoxb-... bot token
+#   SLACK_SIGNING_SECRET         from Slack app "Basic Information"
+#   GOOGLE_SERVICE_ACCOUNT_JSON  full JSON key file of the service account

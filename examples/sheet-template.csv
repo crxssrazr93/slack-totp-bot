@@ -1,0 +1,4 @@
+name,secret,username,digits,period,algorithm,enabled,notes
+GitHub (ops),JBSWY3DPEHPK3PXP,ops@example.com,6,30,SHA1,TRUE,Shared admin account
+AWS root,KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TF,root@example.com,,,,TRUE,Defaults are 6 digits / 30s / SHA1
+Old vendor portal,GEZDGNBVGY3TQOJQ,legacy@example.com,,,,FALSE,Disabled rows are ignored

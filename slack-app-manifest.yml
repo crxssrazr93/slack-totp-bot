@@ -1,0 +1,25 @@
+# Paste this at https://api.slack.com/apps > Create New App > From a manifest.
+# Replace the url with your Worker URL after the first deploy.
+display_information:
+  name: TOTP Bot
+  description: Shared 2FA codes for the team
+features:
+  bot_user:
+    display_name: totp-bot
+    always_online: true
+  slash_commands:
+    - command: /totp
+      url: https://slack-totp-bot.YOUR-SUBDOMAIN.workers.dev/slack/commands
+      description: Show current 2FA codes (only you see the reply)
+      usage_hint: "[app name]"
+      should_escape: false
+oauth_config:
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      - pins:write
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
