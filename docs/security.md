@@ -20,7 +20,7 @@ Sharing 2FA codes is a trade off. It is better than texting codes around or keep
 
 ## The live board vs. slash command only
 
-The board posts codes into channel history. Every minute's codes are overwritten, and old codes are useless once they expire, so the practical risk is low. However:
+The board posts codes into channel history. The codes are overwritten every 30 seconds, and old codes are useless once they expire, so the practical risk is low. However:
 
 * Slack workspace exports and compliance tools (Enterprise Grid, Discovery API) may retain edited message content.
 * Anyone who can read the channel later can see that a code existed and when.

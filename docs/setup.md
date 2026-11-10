@@ -93,13 +93,13 @@ The output ends with your URL, for example `https://slack-totp-bot.your-subdomai
 ## 7. Check it works
 
 * In the private channel, type `/totp`. You should see every code, with "Only visible to you".
-* Within a minute the bot posts and pins the live board. After that the same message is edited every minute.
+* Within a minute the bot posts and pins the live board (a table of every account and its code). After that the same message is edited every 30 seconds.
 * Compare one code with your authenticator app. They should match.
 * Type `/totp` in any other channel. The bot should refuse.
 
 ## Day to day
 
-* **Add an account:** add a row to the sheet. It appears on the next board refresh (within a minute) and immediately in `/totp`.
+* **Add an account:** add a row to the sheet. It appears on the next board refresh (within 30 seconds) and immediately in `/totp`.
 * **Remove access for a person:** remove them from the Slack channel. Then, since they saw the codes but never the secrets, nothing else is needed unless they also know the account passwords.
 * **Retire an account:** set `enabled` to `FALSE` or delete the row.
 * **Do not want the board?** Delete the `[triggers]` block from `wrangler.toml` and redeploy. `/totp` keeps working. See [security.md](security.md) for why you might choose that.
@@ -114,6 +114,7 @@ Live logs: `npx wrangler tail`.
 | `Invalid signature` in logs | `SLACK_SIGNING_SECRET` is wrong (it is not the bot token, and not the client secret) |
 | "only works in the shared 2FA channel" in the right channel | `SLACK_CHANNEL_ID` does not match, copy it again from the channel About tab |
 | "Could not read the codes sheet" | Look in `wrangler tail`. `PERMISSION_DENIED`: sheet not shared with the service account email. `Unable to parse range`: tab is not called `TOTP`. `API has not been used`: enable the Sheets API in the same project as the key |
-| Board never appears | Bot not invited to the channel (`not_in_channel`), or the KV id is still the placeholder |
+| Board never appears | Bot not invited to the channel (`not_in_channel`), or the KV id is still the placeholder. `invalid_blocks` means your Slack workspace does not support table blocks yet |
+| A code on the board is briefly wrong right after the minute | Cron Triggers can start a few seconds late, so for those seconds the board still shows the previous code. `/totp` is always exact |
 | Codes do not match the authenticator app | Wrong secret, or the account uses non default digits, period or algorithm. Check the site's setup page or the `otpauth://` link parameters |
 | `Exceeded CPU time limit` | Rare on Workers Free (10 ms CPU per request) with very large sheets. The Workers Paid plan raises the limit |

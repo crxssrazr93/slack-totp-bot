@@ -2,7 +2,7 @@ import hashlib
 import hmac
 
 from accounts import Account
-from slack import board_message, command_response, verify_signature
+from slack import board_message, command_response, group_code, verify_signature
 from totp import totp
 
 SECRET = "8f742231b10e8888abcd99yyyzzz85a5"
@@ -35,9 +35,24 @@ def test_command_no_match():
     assert "No account matches" in command_response(ACCOUNTS, [], "nope", now=0)["text"]
 
 
-def test_board_shows_current_and_next_code():
-    message = board_message(ACCOUNTS, ["Row 9: bad"], now=1000)
-    text = message["blocks"][1]["text"]["text"]
-    assert f"Now: `{totp('JBSWY3DPEHPK3PXP', 1000)}`" in text
-    assert f"Next: `{totp('JBSWY3DPEHPK3PXP', 1020)}`" in text
+def test_group_code():
+    assert group_code("482193") == "482 193"
+    assert group_code("12345678") == "1234 5678"
+
+
+def test_board_is_one_table_with_every_account():
+    accounts = [Account(f"App {i}", "JBSWY3DPEHPK3PXP") for i in range(60)]
+    message = board_message(accounts, ["Row 9: bad"], now=1000)
+    table = message["blocks"][0]
+    assert table["type"] == "table"
+    assert len(table["rows"]) == 60
+    assert table["column_settings"][1]["align"] == "right"
+    first = table["rows"][0]
+    assert first[0]["elements"][0]["elements"][0] == {"type": "text", "text": "App 0", "style": {"bold": True}}
+    assert first[1]["text"] == group_code(totp("JBSWY3DPEHPK3PXP", 1000))
     assert any("Row 9" in str(b) for b in message["blocks"])
+    assert "Refreshes every 30 seconds" in str(message["blocks"][-1])
+
+
+def test_board_empty_sheet():
+    assert "No accounts" in str(board_message([], [], now=0)["blocks"])

@@ -8,6 +8,7 @@ from totp import totp, window_end
 
 MAX_REQUEST_AGE_SECONDS = 60 * 5
 MAX_ACCOUNT_BLOCKS = 45  # Slack allows 50 blocks per message; leave room for header/footer.
+MAX_TABLE_ROWS = 100  # Slack table block limit.
 
 
 def verify_signature(signing_secret: str, timestamp: str, body: str, signature: str, now: float) -> bool:
@@ -63,36 +64,42 @@ def command_response(accounts: list[Account], problems: list[str], query: str, n
     return {"response_type": "ephemeral", "text": "TOTP codes", "blocks": blocks}
 
 
-def board_message(accounts: list[Account], problems: list[str], now: float) -> dict:
-    """The pinned "live board", rewritten every minute by the cron trigger.
+def group_code(code: str) -> str:
+    """482193 -> "482 193", 12345678 -> "1234 5678"."""
+    half = len(code) // 2
+    return f"{code[:half]} {code[half:]}"
 
-    Each account shows the current code and the next one, so a code is
-    always on screen even between cron runs.
+
+def board_message(accounts: list[Account], problems: list[str], now: float) -> dict:
+    """The pinned live board: every account as one table row, name left, code right.
+
+    Rewritten every 30 seconds by the cron trigger (see entry.py).
     """
-    blocks = [{
-        "type": "header",
-        "text": {"type": "plain_text", "text": "Shared 2FA codes (auto refresh every minute)"},
-    }]
-    for account in accounts[:MAX_ACCOUNT_BLOCKS]:
-        now_end = window_end(now, account.period)
-        current = totp(account.secret, now, account.digits, account.period, account.algorithm)
-        upcoming = totp(account.secret, now_end, account.digits, account.period, account.algorithm)
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    f"{_title(account)}\n"
-                    f"Now: `{current}` until {_until(now_end)}\n"
-                    f"Next: `{upcoming}` until {_until(now_end + account.period)}"
-                ),
+    rows = []
+    for account in accounts[:MAX_TABLE_ROWS]:
+        code = totp(account.secret, now, account.digits, account.period, account.algorithm)
+        rows.append([
+            {
+                "type": "rich_text",
+                "elements": [{
+                    "type": "rich_text_section",
+                    "elements": [{"type": "text", "text": account.name, "style": {"bold": True}}],
+                }],
             },
-        })
-    if not accounts:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "No accounts in the sheet yet."}})
+            {"type": "raw_text", "text": group_code(code)},
+        ])
+
+    if rows:
+        blocks = [{
+            "type": "table",
+            "column_settings": [{"is_wrapped": True}, {"align": "right"}],
+            "rows": rows,
+        }]
+    else:
+        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "No accounts in the sheet yet."}}]
     blocks += _problems_block(problems)
     blocks.append({
         "type": "context",
-        "elements": [{"type": "mrkdwn", "text": f"Updated {_until(int(now))}. Need a guaranteed fresh code? Type `/totp <name>`."}],
+        "elements": [{"type": "mrkdwn", "text": f"Refreshes every 30 seconds  ·  updated {_until(int(now))}"}],
     })
     return {"text": "Shared 2FA codes", "blocks": blocks}

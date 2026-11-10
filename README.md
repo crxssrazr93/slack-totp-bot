@@ -7,7 +7,14 @@ It runs as a Python [Cloudflare Worker](https://developers.cloudflare.com/worker
 ## What your team gets
 
 1. **`/totp`** in the private channel replies with every code, visible only to the person who asked (Slack "ephemeral" message). `/totp github` filters by name. This is always exact, because the code is computed at the moment you ask.
-2. **A live board**: a pinned message in the channel that the bot rewrites every minute. It shows each account's current code and the next one, with the time each expires in the viewer's own timezone. Nobody has to ask for anything.
+2. **A live board**: one pinned message listing every account, name on the left and code on the right, rewritten every 30 seconds. Nobody has to ask for anything.
+
+   ```
+   GitHub        482 193
+   AWS           731 046
+   Notion        905 274
+   Refreshes every 30 seconds
+   ```
 
 Codes are never stored. They are computed on demand from the secrets in your sheet (TOTP codes are just a function of the secret and the clock).
 
@@ -19,7 +26,7 @@ Codes are never stored. They are computed on demand from the secrets in your she
         ▼
  Cloudflare Worker (Python)
    ├─ POST /slack/commands  ◄── Slack slash command /totp (signature verified)
-   └─ cron every minute     ──► chat.update on the pinned board message
+   └─ cron every minute     ──► chat.update on the pinned board, twice (every 30 s)
         │
         ▼
  Private Slack channel

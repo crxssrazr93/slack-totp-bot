@@ -1,9 +1,10 @@
 """Cloudflare Worker entry point.
 
 fetch:     POST /slack/commands  handles the /totp slash command.
-scheduled: every minute, rewrites the live board message in the channel.
+scheduled: every minute, rewrites the live board message twice (on each 30 second boundary).
 """
 
+import asyncio
 import json
 import time
 from urllib.parse import parse_qs, urlparse
@@ -15,6 +16,7 @@ from accounts import parse_rows
 from sheets import read_sheet
 
 BOARD_KEY = "board_message_ts"
+REFRESH_SECONDS = 30
 
 
 class Default(WorkerEntrypoint):
@@ -57,6 +59,14 @@ class Default(WorkerEntrypoint):
         return Response.json(slack.command_response(accounts, problems, form.get("text", ""), time.time()))
 
     async def scheduled(self, controller, env, ctx):
+        # Cron Triggers fire at most once a minute, so refresh now and again on
+        # the next 30 second boundary (1s late to be safely inside the new window).
+        await self._update_board()
+        now = time.time()
+        await asyncio.sleep((int(now // REFRESH_SECONDS) + 1) * REFRESH_SECONDS - now + 1)
+        await self._update_board()
+
+    async def _update_board(self):
         accounts, problems = await self._accounts()
         message = slack.board_message(accounts, problems, time.time())
         message["channel"] = self.env.SLACK_CHANNEL_ID

@@ -45,7 +45,8 @@ curl -X POST http://localhost:8787/slack/commands -H "X-Slack-Request-Timestamp:
 * With the old `__scheduled` URL, the request just hits the fetch handler (404). Use the local explorer route above.
 * Google returns `invalid_grant: account not found` for a well formed JWT from an unknown or deleted service account, and a signature error for a bad key. That distinction helps when debugging step 2 of setup.
 * Slack must get a reply within 3 seconds. The Google token is cached per isolate, so only the first request after a cold start pays for the token exchange.
-* The board shows the current and next code because Cron Triggers run at most once per minute while codes rotate every 30 seconds.
+* Cron Triggers run at most once per minute while codes rotate every 30 seconds, so `scheduled` updates the board, `asyncio.sleep`s to the next 30 second boundary (plus 1 s), and updates again. Sleeping is wall time, not CPU time, so it is cheap. Accounts with a period other than 30 still show their correct current code, just refreshed on the 30 second rhythm.
+* The board uses a Slack `table` block (max 100 rows, 10,000 characters). Names are bold `rich_text` cells, codes are right aligned `raw_text` grouped like `482 193`.
 
 ## Changing the secret source
 
